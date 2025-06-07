@@ -109,9 +109,7 @@ To preprocess the datasets, follow these steps:
 
 If your task does not belong to any of the datasets mentioned above, for generation tasks such as QA, math, or code, etc., format the data as `{'Question': str, 'answer': str}`. For multi-choice tasks, format the data as `{'Question': str, 'Correct Choice': str}`. Additionally, modify `scripts/evaluate.py`, `scripts/prompts.py`, and `scripts/run_xxx_xxx.py` to match your task.
 
-### Model Inference
-
-You can run different inference modes using the provided scripts. Below are examples of how to execute each mode:
+ Inference
 
 1. **Direct Reasoning (Direct Generation)**
 ```bash

@@ -163,6 +163,7 @@ def main():
     input_list = []
     for item in filtered_data:
         question = item['Question']
+        
         if dataset_name in ['nq', 'triviaqa', 'hotpotqa', 'musique', 'bamboogle', '2wiki']:
             if 'qwq' in model_path.lower() or 'deepseek' in model_path.lower() or 'sky-t1' in model_path.lower():
                 user_prompt = get_task_instruction_openqa(question, model_name='qwq')
@@ -189,8 +190,10 @@ def main():
                 user_prompt = get_task_instruction_code(question, question_title=question_title, model_name='qwq')
             else:
                 user_prompt = get_task_instruction_code(question)
+        
         else:
             user_prompt = ""  # Default to empty if dataset not matched
+        
         prompt = [{"role": "user", "content": user_prompt}]
         prompt = tokenizer.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True)
         input_list.append(prompt)

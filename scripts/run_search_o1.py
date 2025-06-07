@@ -5,13 +5,13 @@ import time
 import re
 from tqdm import tqdm
 import numpy as np
-import torch
+# import torch
 import string
 from typing import Optional, Tuple, List, Dict
 import argparse
 
 from transformers import AutoTokenizer
-from vllm import LLM, SamplingParams
+# from vllm import LLM, SamplingParams
 
 from bing_search import (
     bing_web_search, 
@@ -272,11 +272,11 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     # Initialize the LLM
-    llm = LLM(
-        model=model_path,
-        tensor_parallel_size=torch.cuda.device_count(),
-        gpu_memory_utilization=0.95,
-    )
+    # llm = LLM(
+    #     model=model_path,
+    #     tensor_parallel_size=torch.cuda.device_count(),
+    #     gpu_memory_utilization=0.95,
+    # )
 
     # ---------------------- Data Loading ----------------------
     with open(data_path, 'r', encoding='utf-8') as json_file:
@@ -301,18 +301,49 @@ def main():
         prompts = [{"role": "user", "content": up} for up in user_prompts]
         prompts = [tokenizer.apply_chat_template([p], tokenize=False, add_generation_prompt=True) for p in prompts]
 
-        output = llm.generate(
-            prompts,
-            sampling_params=SamplingParams(
-                max_tokens=max_tokens,
-                temperature=0.7,
-                top_p=0.8,
-                top_k=20,
-                repetition_penalty=1.05,
-            )
+        # output = llm.generate(
+        #     prompts,
+        #     sampling_params=SamplingParams(
+        #         max_tokens=max_tokens,
+        #         temperature=0.7,
+        #         top_p=0.8,
+        #         top_k=20,
+        #         repetition_penalty=1.05,
+        #     )
+        # )
+        # raw_outputs = [out.outputs[0].text for out in output]
+        from openai import OpenAI
+        import os
+        os.environ['DASHSCOPE_API_KEY'] = "sk-8aef464eb019408f94dc3cc5ef63d46e"
+        client = OpenAI(
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
-
-        raw_outputs = [out.outputs[0].text for out in output]
+        messages = [{"role": "user", "content": "9.9和9.11谁大"}]
+        completion = client.chat.completions.create(
+            model="qwq-plus",  # 您可以按需更换为其它深度思考模型
+            messages=messages,
+            # enable_thinking 参数开启思考过程，QwQ 与 DeepSeek-R1 模型总会进行思考，不支持该参数
+            # extra_body={"enable_thinking": True},
+            stream=True,
+            stop=["首先", "总结"]
+        )
+        reasoning_content = ""  # 完整思考过程
+        answer_content = ""  # 完整回复
+        is_answering = False  # 是否进入回复阶段
+        for chunk in completion:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            # 只收集思考内容
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                reasoning_content += delta.reasoning_content
+            # 收到content，开始进行回复
+            if hasattr(delta, "content") and delta.content:
+                if not is_answering:
+                    is_answering = True
+                answer_content += delta.content
+        raw_outputs = [reasoning_content+answer_content]
         extracted_infos = [extract_answer(raw, mode='infogen') for raw in raw_outputs]
 
         for i, (p, r, e) in enumerate(zip(prompts, raw_outputs, extracted_infos)):
@@ -396,17 +427,55 @@ def main():
     # ---------------------- Generation Function ----------------------
     def run_generation(sequences: List[Dict], max_tokens: int) -> List:
         prompts = [s['prompt'] for s in sequences]
-        sampling_params = SamplingParams(
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k_sampling,
-            repetition_penalty=repetition_penalty,
-            stop=[END_SEARCH_QUERY, tokenizer.eos_token],
-            include_stop_str_in_output=True,
+        # sampling_params = SamplingParams(
+        #     max_tokens=max_tokens,
+        #     temperature=temperature,
+        #     top_p=top_p,
+        #     top_k=top_k_sampling,
+        #     repetition_penalty=repetition_penalty,
+        #     stop=[END_SEARCH_QUERY, tokenizer.eos_token],
+        #     include_stop_str_in_output=True,
+        # )
+        # output_list = llm.generate(prompts, sampling_params=sampling_params)
+        
+        from openai import OpenAI
+        import os
+        os.environ['DASHSCOPE_API_KEY'] = "sk-8aef464eb019408f94dc3cc5ef63d46e"
+        client = OpenAI(
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
-        output_list = llm.generate(prompts, sampling_params=sampling_params)
-        return output_list
+        messages = [{"role": "user", "content": "9.9和9.11谁大"}]
+        completion = client.chat.completions.create(
+            model="qwq-plus",  # 您可以按需更换为其它深度思考模型
+            messages=messages,
+            # enable_thinking 参数开启思考过程，QwQ 与 DeepSeek-R1 模型总会进行思考，不支持该参数
+            # extra_body={"enable_thinking": True},
+            stream=True,
+            stop=["首先", "总结"]
+        )
+        reasoning_content = ""  # 完整思考过程
+        answer_content = ""  # 完整回复
+        is_answering = False  # 是否进入回复阶段
+        for chunk in completion:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            # 只收集思考内容
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                reasoning_content += delta.reasoning_content
+            # 收到content，开始进行回复
+            if hasattr(delta, "content") and delta.content:
+                if not is_answering:
+                    is_answering = True
+                answer_content += delta.content
+      
+        text = reasoning_content + answer_content 
+        special_symbol = END_SEARCH_QUERY
+        if special_symbol in text:
+            text = text[:text.index(special_symbol) + len(special_symbol)]
+
+        return [text]
 
     # Function to extract text between two tags
     def extract_between(text: str, start_tag: str, end_tag: str) -> Optional[str]:
